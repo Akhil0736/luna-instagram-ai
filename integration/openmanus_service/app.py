@@ -10,11 +10,25 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
-# Ensure project root is on sys.path so we can import `openmanus`
+# Ensure project paths are on sys.path so we can import OpenManus and its 'app' package
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
+# Many modules inside OpenManus use absolute imports like `from app.x import ...`
+# so we must also add the openmanus package directory itself to sys.path
+OPENMANUS_DIR = PROJECT_ROOT / "openmanus"
+if str(OPENMANUS_DIR) not in sys.path:
+    sys.path.append(str(OPENMANUS_DIR))
+
+# Load environment variables from .env files (project root and service dir)
+try:
+    load_dotenv(dotenv_path=PROJECT_ROOT / ".env", override=False)
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=False)
+except Exception:
+    # Don't crash if dotenv isn't present; env vars can still come from the host
+    pass
 
 try:
     # OpenManus LLM wrapper
@@ -37,6 +51,10 @@ allowed_origins = [
     frontend_origin,
     "http://127.0.0.1:3000",
     "http://localhost:3000",
+    "http://127.0.0.1:3001",
+    "http://localhost:3001",
+    "http://127.0.0.1:3002",
+    "http://localhost:3002",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +63,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ------------------- Request Logging -----------------------
+import time as _time
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):  # type: ignore[override]
+        _t0 = _time.time()
+        try:
+            path = request.url.path
+        except Exception:
+            path = "<unknown>"
+        # ASCII-only to avoid Unicode issues on some terminals
+        print(f"[REQUEST] {request.method} {path}")
+        response = await call_next(request)
+        dur_ms = (_time.time() - _t0) * 1000
+        print(f"[RESPONSE] {request.method} {path} - {response.status_code} ({dur_ms:.2f}ms)")
+        return response
+
+
+app.add_middleware(LoggingMiddleware)
 
 
 class PlanRequest(BaseModel):
@@ -116,7 +156,10 @@ async def health() -> Dict[str, Any]:
     return {
         "ok": True,
         "openmanus_import": _import_error is None,
+        "openmanus_error": str(_import_error) if _import_error else None,
         "luna_import": _luna_import_error is None,
+        "luna_error": str(_luna_import_error) if _luna_import_error else None,
+        "python_executable": sys.executable,
     }
 
 
@@ -149,6 +192,30 @@ Return JSON with keys: objectives, content_calendar, engagement_playbook, metric
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"plan": text}
+
+
+@app.get("/luna/reports/deep-scan")
+async def luna_reports_deep_scan(niche: str) -> Dict[str, Any]:
+    """Comprehensive premium niche intelligence report using DeepScanOrchestrator."""
+    logger.info("/luna/reports/deep-scan called niche=%s", niche)
+    try:
+        from integration.research_tools.deep_scan_orchestrator import DeepScanOrchestrator
+    except Exception as e:
+        logger.exception("Failed to import DeepScanOrchestrator: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    import time as _time
+    _start = _time.time()
+    try:
+        orch = DeepScanOrchestrator()
+        report = await orch.generate_report(niche)
+        _dur = _time.time() - _start
+        logger.info("/luna/reports/deep-scan completed: %d items in %.2fs", len(report.get("items", [])), _dur)
+        report["duration_seconds"] = round(_dur, 2)
+        return {"success": True, **report}
+    except Exception as e:
+        logger.exception("Error in /luna/reports/deep-scan: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/generate")
@@ -198,11 +265,24 @@ def _get_luna() -> "LunaAgent":  # type: ignore[name-defined]
 async def luna_process_goal(goal: GrowthGoalModel) -> Dict[str, Any]:
     """Accept a GrowthGoal JSON and return a complete growth plan."""
     logger.info("/luna/process-goal called for niche=%s", goal.niche)
+    import time as _time
+    _start = _time.time()
     try:
         gg = goal.to_dataclass()
         luna = _get_luna()
         growth_plan = await luna.process_growth_goal(gg)
-        return {"success": True, "growth_plan": growth_plan}
+        _dur = _time.time() - _start
+        # Safely compute an insights count for logging
+        insights_count = -1
+        if isinstance(growth_plan, dict):
+            rs = growth_plan.get("research_summary")
+            if isinstance(rs, dict):
+                insights_count = len(rs.get("insights", []))
+            else:
+                # If summary is a string, we don't have a structured insights list
+                insights_count = -1
+        logger.info("/luna/process-goal completed in %.2fs (insights=%s)", _dur, insights_count)
+        return {"success": True, "growth_plan": growth_plan, "duration_seconds": round(_dur, 2)}
     except HTTPException:
         raise
     except Exception as e:
@@ -233,6 +313,58 @@ async def luna_research(niche: str) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.exception("Error in /luna/research: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/luna/research/deep-scan")
+async def luna_research_deep_scan(niche: str) -> Dict[str, Any]:
+    """ScrapeDo-only deep extraction scan for high-fidelity metrics per domain."""
+    logger.info("/luna/research/deep-scan called niche=%s", niche)
+    try:
+        from integration.research_tools.scrapedo_tool import ScrapeDoResearchTool
+    except Exception as e:
+        logger.exception("Failed to import ScrapeDoResearchTool: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    import time as _time
+    _start = _time.time()
+    try:
+        tool = ScrapeDoResearchTool()
+        report = await tool.deep_extraction_scan(niche)
+        _dur = _time.time() - _start
+        logger.info("/luna/research/deep-scan completed with %d items in %.2fs", len(report.get("items", [])), _dur)
+        report["duration_seconds"] = round(_dur, 2)
+        return {"success": True, **report}
+    except Exception as e:
+        logger.exception("Error in /luna/research/deep-scan: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ComprehensiveResearchRequest(BaseModel):
+    niche: str
+    goal: str = ""
+    research_types: List[str] | None = None
+
+
+@app.get("/luna/research/full")
+async def luna_research_full(niche: str, goal: str = "") -> Dict[str, Any]:
+    """Run comprehensive multi-provider research and return raw + synthesized insights."""
+    logger.info("/luna/research/full called niche=%s goal=%s", niche, goal)
+    try:
+        from integration.research_tools import LunaResearchOrchestrator
+    except Exception as e:
+        logger.exception("Failed to import orchestrator: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    orchestrator = LunaResearchOrchestrator()
+    import time as _time
+    _start = _time.time()
+    try:
+        result = await orchestrator.conduct_comprehensive_research(niche=niche, goal=goal or "")
+        _dur = _time.time() - _start
+        logger.info("/luna/research/full completed: %d raw insights in %.2fs", len(result.get("raw_insights", [])), _dur)
+        result["duration_seconds"] = round(_dur, 2)
+        return {"success": True, **result}
+    except Exception as e:
+        logger.exception("Error in /luna/research/full: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

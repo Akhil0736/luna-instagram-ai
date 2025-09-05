@@ -97,6 +97,18 @@ class EnhancedTavilyResearchTool(ResearchTool):
             )
         return insights
 
+    async def search_trends(self, topic: str) -> List[ResearchInsight]:
+        """Convenience: run a trends-focused multi-query for a given topic."""
+        queries = [
+            f"{topic}",
+            f"{topic} case studies",
+            f"{topic} success stories",
+            f"{topic} best practices",
+            f"{topic} 2024",
+            f"{topic} 2025",
+        ]
+        return await self.research(queries)
+
     async def _search_query(self, session: aiohttp.ClientSession, query: str) -> List[Dict[str, Any]]:
         url = "https://api.tavily.com/search"
         payload = {
