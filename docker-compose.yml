@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  openmanus:
+    build:
+      context: ./integration/openmanus_service
+      dockerfile: Dockerfile
+    container_name: openmanus
+    ports:
+      - "8000:8000"
+    environment:
+      # CORS to frontend
+      - FRONTEND_ORIGIN=http://localhost:3000
+      # Semantic embeddings via Ollama
+      - EMBEDDINGS_BACKEND=ollama
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_EMBED_MODEL=mxbai-embed-large
+      # Riona bridge
+      - RIONA_BASE_URL=http://riona:8080/api
+      - RIONA_API_TOKEN=${RIONA_API_TOKEN}
+      # State
+      - REDIS_URL=redis://redis:6379/0
+      # Optional research providers
+      - APIFY_TOKEN=${APIFY_TOKEN}
+      - SCRAPEDO_API_KEY=${SCRAPEDO_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+    depends_on:
+      - ollama
+      - redis
+      - riona
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
+    working_dir: /app
+    restart: unless-stopped
+
+  riona:
+    image: yourorg/riona:latest
+    container_name: riona
+    ports:
+      - "8080:8080"
+    environment:
+      - RIONA_TOKEN=${RIONA_API_TOKEN}
+      - CORS_ORIGINS=http://localhost:3000
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: luna-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_LUNA_API_BASE=http://localhost:8000
+    depends_on:
+      - openmanus
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+  redis_data:
