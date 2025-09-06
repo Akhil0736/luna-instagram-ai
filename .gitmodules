@@ -1,0 +1,3 @@
+[submodule "integration/riona"]
+	path = integration/riona
+	url = https://github.com/David-patrick-chuks/Riona-AI-Agent.git
