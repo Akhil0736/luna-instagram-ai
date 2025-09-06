@@ -118,6 +118,38 @@ class LLMService:
         return cls._client
 
 # ------------------------- Luna Agent ----------------------
+
+# ------------------------- Semantic ------------------------
+try:
+    from .semantic import SemanticRouter, EmbeddingsEngine
+except Exception:
+    SemanticRouter = None  # type: ignore
+    EmbeddingsEngine = None  # type: ignore
+
+class SemanticUnderstandRequest(BaseModel):
+    text: str
+
+@app.get("/")
+def root() -> Dict[str, Any]:
+    """Root endpoint for health/status checks."""
+    return {
+        "service": "OpenManus Service",
+        "version": "0.1.0",
+        "semantic_available": bool(SemanticRouter is not None),
+    }
+
+@app.post("/semantic/understand")
+async def semantic_understand(req: SemanticUnderstandRequest) -> Dict[str, Any]:
+    if SemanticRouter is None:
+        raise HTTPException(status_code=503, detail="Semantic engine not available")
+    try:
+        router = SemanticRouter(EmbeddingsEngine())
+        result = await router.understand(req.text)
+        return {"success": True, **result}
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.exception("/semantic/understand error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 try:
     from integration.luna_agent import LunaAgent
     from integration.models import GrowthGoal, ResearchInsight

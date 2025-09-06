@@ -11,3 +11,11 @@ python-dotenv>=1.0.0
 loguru>=0.7.0
 docker>=6.1.3
 google-generativeai>=0.7.0
+
+# Optional: Semantic embeddings backends (install one)
+# Hugging Face Transformers backend for EmbeddingGemma
+transformers>=4.43.0
+torch>=2.2.0
+
+# Ollama Python client (if using local Ollama embedding model)
+ollama>=0.1.8

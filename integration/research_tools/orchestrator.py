@@ -29,6 +29,12 @@ class LunaResearchOrchestrator:
         }
         self.synthesizer = SynthesisTool()
         self.logger = logging.getLogger(__name__)
+        # Semantic engine is optional: import lazily
+        try:
+            from integration.openmanus_service.semantic import EmbeddingsEngine  # type: ignore
+            self._embed_engine = EmbeddingsEngine()
+        except Exception:
+            self._embed_engine = None
 
     async def conduct_comprehensive_research(self, niche: str, goal: str) -> Dict[str, Any]:
         """
@@ -59,6 +65,8 @@ class LunaResearchOrchestrator:
             else:
                 insights.extend(res)
 
+        # Optional semantic prioritization by goal/niche
+        insights = await self._prioritize_semantic(insights, query=goal)
         duration = time.time() - start
         self.logger.info("conduct_comprehensive_research completed: %d insights in %.2fs", len(insights), duration)
         if not insights:
@@ -116,6 +124,8 @@ class LunaResearchOrchestrator:
                 )
             else:
                 insights.extend(res)
+        # Optional semantic prioritization by goal/niche
+        insights = await self._prioritize_semantic(insights, query=goal)
         duration = time.time() - start
         self.logger.info("conduct_raw_insights completed: %d insights in %.2fs", len(insights), duration)
         if not insights:
