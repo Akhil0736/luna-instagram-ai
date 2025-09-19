@@ -6,7 +6,7 @@ import logging
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-# from agents.conversation.conversation_agent import ConversationAgent
+from agents.conversation.conversation_agent import ConversationAgent
 from agents.research.research_agent import ResearchAgent  
 from agents.strategy.strategy_agent import StrategyAgent
 from agents.execution.execution_agent import ExecutionAgent
