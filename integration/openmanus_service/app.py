@@ -396,3 +396,104 @@ async def enhanced_health_check():
             "parallel_ai_configured": bool(os.getenv("PARALLEL_AI_API_KEY"))
         }
     }
+
+# Add Riona integration routes
+from api.routes.riona_routes import router as riona_router
+app.include_router(riona_router)
+
+@app.get("/luna/system/complete-info")
+async def get_complete_system_info():
+    """Enhanced system info including Riona integration status"""
+    try:
+        from integration.riona_controller import RionaController
+        
+        # Test Riona controller
+        controller = RionaController()
+        riona_status = "operational"
+        
+    except Exception as e:
+        riona_status = f"error: {str(e)}"
+    
+    return {
+        "luna_status": "Multi-Agent Research System with Riona Integration",
+        "version": "3.1.0",
+        "available": True,
+        "components": {
+            "conversation_agent": "✅ Intelligent context extraction and question generation",
+            "research_agent": "✅ Comprehensive competitor and market analysis", 
+            "strategy_agent": "✅ Multi-expert strategy synthesis",
+            "execution_agent": "✅ Implementation planning and automation scope",
+            "riona_integration": f"✅ Strategy-to-execution pipeline: {riona_status}"
+        },
+        "new_capabilities": {
+            "strategy_execution": "/luna/riona/execute-strategy",
+            "execution_tracking": "/luna/riona/execution-status/{execution_id}",
+            "user_executions": "/luna/riona/executions/user/{user_id}",
+            "integration_health": "/luna/riona/health"
+        }
+    }
+
+# Add Scheduling Routes
+try:
+    from api.routes.scheduling_routes import router as scheduling_router
+    app.include_router(scheduling_router)
+    print("✅ Scheduling routes loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Could not load scheduling routes: {e}")
+
+@app.get("/luna/system/scheduling-info")
+async def get_scheduling_system_info():
+    """Get information about the humanized scheduling system"""
+    return {
+        "scheduling_system": "Humanized Social Media Manager",
+        "version": "1.0.0",
+        "features": {
+            "user_controlled_hours": "✅ Custom work hours per user",
+            "intelligent_breaks": "✅ Coffee breaks and lunch breaks",
+            "activity_limits": "✅ Daily limits with weekend adjustments", 
+            "natural_delays": "✅ Human-like thinking delays",
+            "stealth_mode": "✅ Instagram bot detection avoidance",
+            "adaptive_patterns": "✅ Learning from user behavior"
+        },
+        "endpoints": {
+            "set_preferences": "/luna/scheduling/preferences",
+            "get_status": "/luna/scheduling/status/{user_id}",
+            "activity_summary": "/luna/scheduling/activity-summary/{user_id}",
+            "test_schedule": "/luna/scheduling/test-schedule/{user_id}",
+            "scheduled_execution": "/luna/scheduling/execute-strategy"
+        }
+    }
+
+# Add Task Execution Routes
+try:
+    from api.routes.execution_routes import router as execution_router
+    app.include_router(execution_router)
+    print("✅ Task execution routes loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Could not load execution routes: {e}")
+
+@app.get("/luna/system/execution-info")
+async def get_execution_system_info():
+    """Get information about the task execution system"""
+    return {
+        "execution_system": "Riona Task Execution Engine",
+        "version": "1.0.0",
+        "capabilities": {
+            "smart_engagement": "✅ Intelligent post liking with rate limiting",
+            "intelligent_commenting": "✅ Context-aware comment generation",
+            "strategic_following": "✅ Targeted follow/unfollow automation",
+            "audience_research": "✅ Competitor analysis and target identification"
+        },
+        "safety_features": {
+            "rate_limiting": "✅ Instagram-compliant rate limits",
+            "human_delays": "✅ Randomized human-like timing",
+            "engagement_only": "✅ No posting or content creation",
+            "error_handling": "✅ Comprehensive error recovery"
+        },
+        "endpoints": {
+            "initialize_executor": "/luna/execution/initialize-executor",
+            "execute_task": "/luna/execution/execute-task",
+            "executor_stats": "/luna/execution/executor-stats/{user_id}",
+            "test_engagement": "/luna/execution/test-engagement"
+        }
+    }
