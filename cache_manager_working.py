@@ -19,6 +19,8 @@ class WorkingLunaCacheManager:
         self.cache_hits = 0
         self.cache_misses = 0
         self.total_cost_saved = 0.0
+        # User query history for memory hand-off
+        self.user_histories: Dict[str, List[Dict[str, Any]]] = {}
 
     async def init_redis(self):
         logger.info("🔌 Memory-optimized cache ready (no Redis dependency)")
@@ -90,6 +92,28 @@ class WorkingLunaCacheManager:
             self.l1_cache[cache_key] = cache_item
         
         logger.info(f"💾 Cached: {cache_key[:16]}... (TTL: {ttl}s)")
+
+    def store_query_response(self, user_id: str, query: str, response: str) -> None:
+        """Persist user-specific query/response for lightweight memory."""
+        if not user_id:
+            return
+
+        history = self.user_histories.setdefault(user_id, [])
+        history.append(
+            {
+                "query": query,
+                "response": response,
+                "timestamp": time.time(),
+            }
+        )
+
+        # Trim history to latest 20 entries per user to bound memory usage
+        if len(history) > 20:
+            del history[:-20]
+
+    def get_user_history(self, user_id: str) -> List[Dict[str, Any]]:
+        """Return recorded history for a user."""
+        return list(self.user_histories.get(user_id, []))
 
     def get_cache_stats(self) -> Dict[str, Any]:
         total_requests = self.cache_hits + self.cache_misses

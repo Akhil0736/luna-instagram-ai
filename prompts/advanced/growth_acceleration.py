@@ -52,7 +52,7 @@ Augments Luna’s framework with the ROCKET method for rapid follower growth and
 ## ROCKET ACCELERATION TEMPLATE
 
 def build_growth_acceleration_prompt(context):
-    return f"""
+    return f'''
 ROCKET Growth Acceleration Plan for {context['account_name']}
 Rapid Content Pipeline
 Batch create: {context['batch_reels']} Reels, {context['batch_carousels']} Carousels, {context['daily_stories']} Stories
@@ -81,6 +81,7 @@ Weekly retrospective schedule: {context['retro_schedule']}
 Monthly planning meeting: {context['planning_schedule']}
 Community validation polls: {context['poll_schedule']}
 Plan validated by rapid-growth case studies and community feedback
+'''
 """
 
 PROMPT_INFO = {

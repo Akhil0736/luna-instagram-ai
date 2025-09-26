@@ -3,6 +3,8 @@ Luna AI Prompt Module
 Generated for Luna Instagram AI Coach
 """
 
+PROMPT_NAME = "Enhanced Global System"
+
 PROMPT_INFO = {
     "name": "Enhanced Global System",
     "description": "Enterprise-grade foundation with multi-AI architecture integration",

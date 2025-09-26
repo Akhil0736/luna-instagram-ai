@@ -55,7 +55,7 @@ Reddit feedback loop: validate new tactics every month
 STRUCTURED PROMPT TEMPLATE
 python
 def build_content_strategy_prompt(context):
-    return f"""
+    return f'''
 ## SPARK Content Strategy for {context['niche']} Account
 
 ### Situation Analysis
@@ -86,6 +86,7 @@ def build_content_strategy_prompt(context):
 - Tracking cadence: Weekly review & monthly pivot
 
 *Validated by Reddit community discussions on content strategy* [1][2][3][4]
+'''
 """
 
 PROMPT_INFO = {
@@ -104,4 +105,4 @@ PROMPT_INFO = {
     "integration_points": ["global_system", "instagram_expert", "consultation_methodology"]
 }
 
-all = ['PROMPT_NAME', 'PROMPT_INFO']
+__all__ = ["PROMPT_NAME", "PROMPT_INFO"]

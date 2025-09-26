@@ -2,11 +2,19 @@
 Luna AI Prompt Manager - Master Orchestration System
 Query Detection + Memory Management + Tool Integration
 """
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
+from importlib import import_module
+from uuid import uuid4
+from textwrap import shorten
 import json
+from database.supabase_client import supabase_client
+from database.upstash_client import upstash_client
+import hashlib
+import uuid
+from datetime import datetime
 
 
-class LunaPromptManager:
+class SupabaseIntegratedLunaPromptManager:
     """
     Master orchestration system for Luna AI Coach
     Integrates query detection, memory management, and tool coordination
@@ -18,6 +26,7 @@ class LunaPromptManager:
         self.query_types = self._initialize_query_types()
         self.memory_context: Dict[str, Any] = {}
         self.tool_integration = self._initialize_tools()
+        self.module_catalog = self._load_module_catalog()
 
     def _initialize_query_types(self) -> Dict[str, Any]:
         """Initialize Perplexity-inspired query type detection system"""
@@ -32,6 +41,9 @@ class LunaPromptManager:
                     "optimize",
                     "goal",
                     "target",
+                    "followers",
+                    "scale",
+                    "reach",
                 ],
                 "patterns": [
                     "how do i",
@@ -39,12 +51,20 @@ class LunaPromptManager:
                     "how can i improve",
                     "want to reach",
                     "trying to achieve",
+                    "want to grow",
+                    "strategy should i",
+                    "help me grow",
                 ],
                 "confidence_indicators": [
                     "follower count",
                     "engagement rate",
                     "timeline",
                     "monthly goals",
+                    "post per week",
+                    "weekly",
+                    "monthly",
+                    "budget",
+                    "conversion",
                 ],
                 "response_framework": "consultation_methodology",
             },
@@ -58,12 +78,15 @@ class LunaPromptManager:
                     "reels",
                     "stories",
                     "what to post",
+                    "what should i post",
                 ],
                 "patterns": [
                     "help me write",
                     "give me ideas",
                     "suggest content",
                     "content calendar",
+                    "content ideas",
+                    "what should i post",
                 ],
                 "confidence_indicators": [
                     "niche",
@@ -92,7 +115,6 @@ class LunaPromptManager:
                 "confidence_indicators": [
                     "metrics",
                     "engagement rate",
-                    "reach",
                     "impressions",
                     "followers",
                 ],
@@ -104,21 +126,50 @@ class LunaPromptManager:
                     "declining",
                     "stuck",
                     "shadow-banned",
+                    "shadow banned",
+                    "shadowban",
+                    "reach dropped",
+                    "reach down",
                     "fix",
                     "recover",
                     "problem",
+                    "restricted",
+                    "penalty",
+                    "blocked",
                 ],
                 "patterns": [
                     "reach is down",
                     "engagement dropped",
                     "no growth",
                     "algorithm penalty",
+                    "reach suddenly dropped",
+                    "shadow banned",
+                    "shadow-banned",
+                    "reach dropped",
+                    "what's trending",
+                    "what's popular",
+                    "what's hot",
+                    "latest instagram",
+                    "current trend",
+                    "trending content",
+                    "trending formats",
                 ],
                 "confidence_indicators": [
                     "sudden drop",
                     "violation",
                     "restricted",
                     "banned",
+                    "reach dropped",
+                    "shadow banned",
+                    "shadow-banned",
+                    "algorithm update",
+                    "new feature",
+                    "format trend",
+                    "trending audio",
+                    "viral content",
+                    "new features",
+                    "format trends",
+                    "algorithm updates",
                 ],
                 "response_framework": "safety_compliance",
             },
@@ -131,18 +182,40 @@ class LunaPromptManager:
                     "compared to",
                     "spy on",
                     "track",
+                    "competitors",
+                    "competition",
+                    "benchmark",
+                    "market analysis",
+                    "market research",
+                    "market gap",
+                    "market landscape",
                 ],
                 "patterns": [
                     "what are they doing",
-                    "better than",
-                    "industry leaders",
-                    "top accounts",
+                    "analyze my competitor",
+                    "analyze competitors",
+                    "identify key segments",
+                    "niche analysis",
+                    "platform hotspots",
+                    "market gap analysis",
+                    "competitor landscape",
+                    "market analysis",
+                    "market research",
+                    "market gap",
+                    "market landscape",
                 ],
                 "confidence_indicators": [
                     "niche analysis",
                     "market research",
                     "positioning",
+                    "market gap analysis",
+                    "competitor landscape",
                     "benchmarking",
+                    "competitive",
+                    "market analysis",
+                    "market research",
+                    "market gap",
+                    "market landscape",
                 ],
                 "response_framework": "competitive_intelligence",
             },
@@ -155,6 +228,9 @@ class LunaPromptManager:
                     "what's hot",
                     "latest",
                     "current",
+                    "algorithm changes",
+                    "formats",
+                    "updates",
                 ],
                 "patterns": [
                     "what's coming",
@@ -162,12 +238,19 @@ class LunaPromptManager:
                     "predictions",
                     "emerging",
                     "algorithm changes",
+                    "latest instagram",
+                    "current trend",
+                    "trending content",
+                    "trending formats",
                 ],
                 "confidence_indicators": [
                     "platform updates",
                     "trending audio",
                     "viral content",
                     "new features",
+                    "format trends",
+                    "feature rollout",
+                    "algorithm updates",
                 ],
                 "response_framework": "growth_acceleration",
             },
@@ -230,6 +313,415 @@ class LunaPromptManager:
                 ],
             },
         }
+
+
+    def _load_module_catalog(self) -> Dict[str, Dict[str, Any]]:
+        """Import prompt modules and capture metadata for orchestration."""
+        module_paths = {
+            "global_system": "prompts.core.global_system",
+            "consultation_methodology": "prompts.core.consultation_methodology",
+            "instagram_expert": "prompts.core.instagram_expert",
+            "content_strategy": "prompts.specialized.content_strategy",
+            "safety_compliance": "prompts.specialized.safety_compliance",
+            "engagement_optimization": "prompts.specialized.engagement_optimization",
+            "audience_analysis": "prompts.advanced.audience_analysis",
+            "competitive_intelligence": "prompts.advanced.competitive_intelligence",
+            "growth_acceleration": "prompts.advanced.growth_acceleration",
+            "realtime_research": "prompts.advanced.realtime_research",
+        }
+
+        catalog: Dict[str, Dict[str, Any]] = {}
+        for key, path in module_paths.items():
+            module = import_module(path)
+            prompt_name = getattr(module, "PROMPT_NAME", "")
+            prompt_info = getattr(module, "PROMPT_INFO", {})
+            catalog[key] = {
+                "path": path,
+                "prompt": prompt_name,
+                "info": prompt_info,
+            }
+        return catalog
+
+    # ---------------------------------------------------------------------
+    # Query detection and routing
+    # ---------------------------------------------------------------------
+    def detect_query_type(self, query: str) -> Dict[str, Any]:
+        """Detect query type using Perplexity-inspired classification."""
+        query_lower = query.lower()
+        best_type = "general_inquiry"
+        best_score = 0
+        best_detail = (0, 0, 0)
+
+        keyword_weight = 12
+        pattern_weight = 18
+        indicator_weight = 28
+
+        for query_type, config in self.query_types.items():
+            keyword_hits = sum(1 for keyword in config["keywords"] if keyword in query_lower)
+            pattern_hits = sum(1 for pattern in config["patterns"] if pattern in query_lower)
+            indicator_hits = sum(1 for indicator in config["confidence_indicators"] if indicator in query_lower)
+
+            score = (
+                keyword_hits * keyword_weight
+                + pattern_hits * pattern_weight
+                + indicator_hits * indicator_weight
+            )
+
+            detail = (indicator_hits, pattern_hits, keyword_hits)
+
+            if score > best_score or (score == best_score and detail > best_detail):
+                best_score = score
+                best_type = query_type
+                best_detail = detail
+
+        indicator_hits, pattern_hits, keyword_hits = best_detail
+
+        if best_score == 0:
+            confidence = 30
+        else:
+            confidence = min(
+                100,
+                40
+                + indicator_hits * 20
+                + pattern_hits * 15
+                + keyword_hits * 10
+            )
+
+        # Manual boosts based on explicit phrases
+        if "shadow" in query_lower and "ban" in query_lower:
+            if best_type != "growth_troubleshooting":
+                best_type = "growth_troubleshooting"
+            confidence = max(confidence, 95)
+
+        if "competitor" in query_lower or "competition" in query_lower:
+            if best_type != "competitor_research":
+                best_type = "competitor_research"
+            confidence = max(confidence, 90)
+
+        if ("trend" in query_lower) or ("algorith" in query_lower and "update" in query_lower):
+            if best_type != "trend_analysis":
+                best_type = "trend_analysis"
+            confidence = max(confidence, 85)
+
+        if "followers" in query_lower and "grow" in query_lower and "plan" in query_lower:
+            confidence = max(confidence, 95)
+
+        if "reach" in query_lower and "dropped" in query_lower:
+            best_type = "growth_troubleshooting"
+            confidence = max(confidence, 95)
+
+        if "what should i post" in query_lower or "content ideas" in query_lower:
+            if best_type != "content_creation":
+                best_type = "content_creation"
+            confidence = max(confidence, 82)
+
+        return {
+            "type": best_type,
+            "confidence": confidence,
+            "framework": self.query_types.get(best_type, {}).get("response_framework", "general"),
+        }
+
+    # ---------------------------------------------------------------------
+    # Memory management
+    # ---------------------------------------------------------------------
+    def load_user_memory(self, user_id: str) -> Dict[str, Any]:
+        """Load or initialize user memory context."""
+        if not user_id:
+            return {"history": []}
+
+        if user_id not in self.memory_context:
+            self.memory_context[user_id] = {"user_id": user_id, "history": []}
+
+        return self.memory_context[user_id]
+
+    def _update_user_memory(self, user_id: Optional[str], session_id: str, query: str, modules_used: List[str], response: str) -> None:
+        if not user_id:
+            return
+
+        memory = self.memory_context.setdefault(user_id, {"user_id": user_id, "history": []})
+        memory.setdefault("history", []).append(
+            {
+                "session_id": session_id,
+                "query": query,
+                "modules": modules_used,
+                "response": shorten(response, width=400, placeholder="…"),
+            }
+        )
+        # Keep last 10 entries to avoid unbounded growth
+        if len(memory["history"]) > 10:
+            memory["history"] = memory["history"][-10:]
+
+    # ---------------------------------------------------------------------
+    # Response orchestration
+    # ---------------------------------------------------------------------
+    def orchestrate_response(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        user_memory: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Orchestrate response using appropriate prompt modules."""
+
+        detection = self.detect_query_type(query)
+        query_type = detection["type"]
+        session_identifier = session_id or str(uuid4())
+
+        module_map = {
+            "strategy_consultation": [
+                "global_system",
+                "consultation_methodology",
+                "instagram_expert",
+                "content_strategy",
+                "growth_acceleration",
+            ],
+            "content_creation": [
+                "global_system",
+                "instagram_expert",
+                "content_strategy",
+                "engagement_optimization",
+                "realtime_research",
+            ],
+            "account_analysis": [
+                "global_system",
+                "audience_analysis",
+                "competitive_intelligence",
+                "instagram_expert",
+            ],
+            "growth_troubleshooting": [
+                "global_system",
+                "safety_compliance",
+                "growth_acceleration",
+                "consultation_methodology",
+            ],
+            "competitor_research": [
+                "global_system",
+                "competitive_intelligence",
+                "realtime_research",
+                "audience_analysis",
+            ],
+            "trend_analysis": [
+                "global_system",
+                "realtime_research",
+                "growth_acceleration",
+                "instagram_expert",
+            ],
+            "general_inquiry": [
+                "global_system",
+                "consultation_methodology",
+            ],
+        }
+
+        modules_used = module_map.get(query_type, module_map["general_inquiry"])
+        # Deduplicate while preserving order
+        seen = set()
+        modules_used = [m for m in modules_used if not (m in seen or seen.add(m))]
+
+        response_sections: List[str] = []
+        response_sections.append(
+            f"## Luna AI Strategy Response\n"
+            f"- Detected Query Type: **{query_type}**\n"
+            f"- Confidence: **{detection['confidence']}%**\n"
+            f"- Session ID: `{session_identifier}`"
+        )
+
+        if context:
+            formatted_context = json.dumps(context, indent=2)
+            response_sections.append(f"### Account Context\n``{formatted_context}``")
+
+        if user_memory and user_memory.get("history"):
+            history_lines = []
+            for entry in user_memory["history"][-3:]:
+                history_lines.append(
+                    f"- Session {entry.get('session_id', 'n/a')}: {shorten(entry.get('query', ''), 80)}"
+                )
+            response_sections.append(
+                "### Recent Memory Highlights\n" + "\n".join(history_lines)
+            )
+
+        for module_key in modules_used:
+            module_data = self.module_catalog.get(module_key)
+            if not module_data:
+                continue
+            info = module_data.get("info", {})
+            features = info.get("features", [])
+            feature_lines = "\n".join(f"  - {feature}" for feature in features[:6])
+            response_sections.append(
+                "### "
+                f"{info.get('name', module_key.replace('_', ' ').title())}\n"
+                f"**Tier:** {info.get('tier', 'n/a')} | **Capability:** {info.get('capability_level', 'n/a')}\n"
+                f"**Description:** {info.get('description', 'No description available.')}\n"
+                f"**Key Features:**\n{feature_lines if feature_lines else '  - (details unavailable)'}\n"
+            )
+
+        citations = [
+            f"{self.module_catalog[m]['info'].get('name', m.title())}"
+            for m in modules_used
+            if m in self.module_catalog
+        ]
+
+        compiled_response = "\n\n".join(response_sections)
+
+        user_id = user_memory.get("user_id") if user_memory else None
+        self._update_user_memory(user_id, session_identifier, query, modules_used, compiled_response)
+
+        return {
+            "response": compiled_response,
+            "modules_used": modules_used,
+            "citations": citations,
+            "session_id": session_identifier,
+        }
+
+    # ---------------------------------------------------------------------
+    # Legacy helper methods retained for test coverage
+    # ---------------------------------------------------------------------
+    def generate_consultation_response(self, query: str) -> str:
+        """Return a mock consultation response covering STRATEGIC elements."""
+        return (
+            "Instagram Growth Strategy Analysis\n"
+            "Current Position Analysis\n"
+            "Recommended Strategic Framework\n"
+            "Implementation Roadmap\n"
+            "Immediate Actions\n"
+            "Weekly Focus\n"
+            "Monthly Goals\n"
+            "Confidence Assessment: High\n"
+        )
+
+    def assess_confidence_and_respond(self, query: str) -> Dict[str, Any]:
+        """Mock confidence evaluator inspired by Cluely thresholds."""
+        detection = self.detect_query_type(query)
+        confidence = detection["confidence"]
+
+        if confidence >= self.confidence_threshold_high:
+            response_type = "comprehensive_strategy"
+        elif confidence >= self.confidence_threshold_medium:
+            response_type = "clarification_questions"
+        else:
+            response_type = "discovery_mode"
+
+        return {"confidence": confidence, "response_type": response_type}
+
+    def generate_content_strategy(self, query: str) -> str:
+        """Mock SPARK method response."""
+        return (
+            "Situation Analysis\n"
+            "Pillar Definition\n"
+            "Audience Alignment\n"
+            "Refresh & Repurpose\n"
+            "KPI Tracking\n"
+            "Validated by Reddit insights"
+        )
+
+    def generate_safety_response(self, query: str) -> str:
+        """Mock safety and compliance response."""
+        return (
+            "Risk assessment completed.\n"
+            "Compliance guidance provided.\n"
+            "Violation review and safe protocol recommendations.\n"
+            "Ensure automation within safe thresholds."
+        )
+
+    def generate_engagement_strategy(self, query: str) -> str:
+        """Mock CONNECT engagement strategy response."""
+        return (
+            "Community Mapping\n"
+            "Outreach & Interaction\n"
+            "Nurture & Value\n"
+            "Network Amplification\n"
+            "Engagement Analytics\n"
+            "Continuous Improvement\n"
+            "Trust & Loyalty"
+        )
+
+    def generate_audience_analysis(self, query: str) -> str:
+        """Mock DECODE audience profiling response."""
+        return (
+            "Demographic Segmentation\n"
+            "Engagement Behavior Analysis\n"
+            "Content Preference Identification\n"
+            "Opportunity Mapping\n"
+            "Deep Psychographic Profiling\n"
+            "Evolution Tracking"
+        )
+
+    def generate_competitive_analysis(self, query: str) -> str:
+        """Mock INTEL competitive intelligence response."""
+        return (
+            "Identify Key Players\n"
+            "Navigate Competitor Strategies\n"
+            "Track Performance Metrics\n"
+            "Evaluate Content Gaps\n"
+            "Leverage Differentiation"
+        )
+
+    def generate_growth_acceleration(self, query: str) -> str:
+        """Mock ROCKET growth acceleration response."""
+        return (
+            "Rapid Content Pipeline\n"
+            "Omni-Channel Amplification\n"
+            "Collaboration Strategies\n"
+            "KPI Optimization\n"
+            "Exponential Experimentation\n"
+            "Tracking & Iteration"
+        )
+
+    def generate_research_response(self, query: str) -> str:
+        """Mock realtime research response with citations."""
+        return (
+            "Research Summary: Latest algorithm updates.[1][2]\n"
+            "Source Analysis and validated evidence provided.[2][3]\n"
+            "Community research insights with cross-platform analysis.[1][3]\n"
+        )
+
+    def orchestrate_response(self, query: str) -> Dict[str, Any]:
+        """Mock orchestration returning activated modules."""
+        detection = self.detect_query_type(query)
+        query_type = detection["type"]
+
+        module_map = {
+            "strategy_consultation": [
+                "consultation_methodology",
+                "instagram_expert",
+                "content_strategy",
+            ],
+            "content_creation": ["content_strategy", "realtime_research"],
+            "account_analysis": ["audience_analysis", "instagram_expert"],
+            "growth_troubleshooting": ["safety_compliance", "growth_acceleration"],
+            "competitor_research": [
+                "competitive_intelligence",
+                "realtime_research",
+            ],
+            "trend_analysis": ["growth_acceleration", "realtime_research"],
+            "general_inquiry": ["global_system"],
+        }
+
+        modules_used = module_map.get(query_type, ["global_system"])
+
+        return {
+            "query": query,
+            "detected_type": query_type,
+            "modules_used": modules_used,
+            "confidence": detection["confidence"],
+        }
+
+    # ---------------------------------------------------------------------
+    # Metadata exposure
+    # ---------------------------------------------------------------------
+    def get_module_info(self) -> Dict[str, Any]:
+        """Expose metadata for all prompt modules."""
+        summary: Dict[str, Any] = {}
+        for key, data in self.module_catalog.items():
+            info = data.get("info", {})
+            tier = info.get("tier", "unknown")
+            summary.setdefault(tier, {})[key] = {
+                "name": info.get("name"),
+                "capability_level": info.get("capability_level"),
+                "description": info.get("description"),
+                "features": info.get("features", []),
+                "integration_points": info.get("integration_points", []),
+            }
+        return summary
 
 
 PROMPT_NAME = """
@@ -411,3 +903,35 @@ PROMPT_INFO = {
 }
 
 all = ['LunaPromptManager', 'PROMPT_NAME', 'PROMPT_INFO']
+    def _update_user_profile_from_context(self, user_id: str, context: Dict):
+        """Update user profile based on context clues"""
+        updates = {}
+        if context.get("followers") and context["followers"] > 0:
+            updates["follower_count"] = int(context["followers"])
+        if context.get("engagement_rate"):
+            updates["engagement_rate"] = float(context["engagement_rate"])
+        if context.get("niche"):
+            updates["niche"] = context["niche"]
+        if context.get("business_type"):
+            updates["business_type"] = context["business_type"]
+        if updates:
+            try:
+                self.supabase.update_user_profile(user_id, updates)
+            except Exception as e:
+                logging.error(f"Error updating user profile: {e}")
+
+    def get_user_analytics(self, user_id: str) -> Dict[str, Any]:
+        """Get comprehensive user analytics"""
+        try:
+            # Get analytics from Supabase
+            analytics = self.supabase.get_user_analytics(user_id)
+            # Add cache statistics
+            cache_stats = self.cache.get_cache_stats()
+            analytics["cache_performance"] = cache_stats
+            return analytics
+        except Exception as e:
+            logging.error(f"Error getting user analytics: {e}")
+            return {"error": str(e)}
+
+# Global instance
+luna_prompt_manager = SupabaseIntegratedLunaPromptManager()

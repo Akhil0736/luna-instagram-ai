@@ -1,0 +1,7 @@
+# Dockerfile.monitoring - Node Exporter for system metrics
+FROM prom/node-exporter:latest
+
+EXPOSE 9100
+
+CMD ["--path.rootfs=/host"]
+LABEL maintainer="Luna AI Team"

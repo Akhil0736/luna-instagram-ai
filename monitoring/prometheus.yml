@@ -1,0 +1,27 @@
+# Prometheus Configuration for Luna AI
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # "rules/*.yml"
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: []
+
+scrape_configs:
+  - job_name: 'luna-ai'
+    static_configs:
+      - targets: ['luna-ai:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['monitoring:9100']
