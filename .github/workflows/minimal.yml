@@ -1,0 +1,46 @@
+name: Luna AI - Minimal Tests
+
+on: [push, pull_request]
+
+jobs:
+  basic-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pydantic>=2.7.1 requests python-dotenv
+        
+    - name: Basic validation
+      run: |
+        echo "✅ Repository structure:"
+        ls -la
+        echo "✅ Python version:"
+        python --version
+        echo "✅ Can import pydantic:"
+        python -c "import pydantic; print(f'Pydantic {pydantic.__version__}')"
+        echo "✅ Implementation directory:"
+        ls -la implementation/ || echo "Creating implementation structure..."
+        mkdir -p implementation
+        echo "✅ Luna AI validation complete!"
+
+    - name: Test core dependencies
+      run: |
+        python -c "
+        try:
+            import pydantic
+            import requests
+            print('✅ All core dependencies working!')
+        except ImportError as e:
+            print(f'❌ Dependency issue: {e}')
+            exit(1)
+        "
