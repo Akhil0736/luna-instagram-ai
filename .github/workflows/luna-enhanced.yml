@@ -23,7 +23,7 @@ jobs:
     - name: Test Luna AI Knowledge Base
       run: |
         python -c "
-        from implementation.knowledge_base.hook_database import ALEX_HORMOZI_HOOKS, INSTAGRAM_2025_ALGORITHM
+        from implementation.knowledge_base import ALEX_HORMOZI_HOOKS, INSTAGRAM_2025_ALGORITHM
         print(f'✅ Loaded {len(ALEX_HORMOZI_HOOKS[\"labels\"])} label hooks')
         print(f'✅ Algorithm priorities: {list(INSTAGRAM_2025_ALGORITHM[\"top_3_ranking_factors\"].keys())}')
         print('✅ Knowledge base validated!')
