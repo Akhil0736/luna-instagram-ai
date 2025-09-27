@@ -18,19 +18,16 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
     - name: Test Luna AI Knowledge Base
       run: |
         python -c "
         from implementation.knowledge_base import ALEX_HORMOZI_HOOKS, INSTAGRAM_2025_ALGORITHM
-        print(f'✅ Loaded {len(ALEX_HORMOZI_HOOKS[\"labels\"])} label hooks')
+        print(f'✅ Loaded {len(ALEX_HORMOZI_HOOKS.keys())} hook categories')
         print(f'✅ Algorithm priorities: {list(INSTAGRAM_2025_ALGORITHM[\"top_3_ranking_factors\"].keys())}')
         print('✅ Knowledge base validated!')
         "
         
     - name: Test Content Strategist Agent
-      run: |
         python -c "
         from implementation.agents.content_strategist import ContentStrategistAgent
         agent = ContentStrategistAgent()
