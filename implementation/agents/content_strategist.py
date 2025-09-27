@@ -26,3 +26,7 @@ class ContentStrategistAgent(AgentBase):
             "posting_schedule": {"optimal_times": ["11:00", "14:00", "20:00"]},
             "algorithm_compliance": {"watch_time_optimized": True}
         }
+
+
+# Backward compatibility alias
+ContentStrategist = ContentStrategistAgent

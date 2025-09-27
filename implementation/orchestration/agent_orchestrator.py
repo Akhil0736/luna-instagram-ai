@@ -10,8 +10,10 @@ from typing import Any, Dict, List, Tuple
 from ..agents.content_strategist import ContentStrategistAgent, ContentStrategist
 from ..agents.engagement_expert import EngagementExpertAgent, EngagementExpert
 from ..agents.growth_hacker import GrowthHackerAgent, GrowthHacker
-from ..agents.funnel_architect import FunnelArchitect  # TODO: upgrade to async agent
+from ..agents.funnel_architect import FunnelArchitectAgent, FunnelArchitect
 from ..knowledge_base.instagram_2025_algorithm import INSTAGRAM_2025_ALGORITHM
+from .agent_debate_system import AgentDebateSystem
+from .consensus_builder import ConsensusBuilder, ConsensusMethod
 from .consensus_engine import ConsensusEngine
 
 
@@ -23,7 +25,7 @@ class AgentOrchestrator:
             "content_strategist": _resolve_agent(ContentStrategistAgent, ContentStrategist),
             "engagement_expert": _resolve_agent(EngagementExpertAgent, EngagementExpert),
             "growth_hacker": _resolve_agent(GrowthHackerAgent, GrowthHacker),
-            "funnel_architect": FunnelArchitect(),
+            "funnel_architect": _resolve_agent(FunnelArchitectAgent, FunnelArchitect),
         }
 
         self.algorithm_weights: Dict[str, float] = {
@@ -33,6 +35,8 @@ class AgentOrchestrator:
         }
         self.consensus_methods: List[str] = ["conventional", "single_text", "visioning"]
         self.consensus_engine = ConsensusEngine()
+        self.debate_system = AgentDebateSystem()
+        self.consensus_builder = ConsensusBuilder()
         self.algorithm_spec = INSTAGRAM_2025_ALGORITHM
 
     async def orchestrate_strategy(
@@ -45,8 +49,9 @@ class AgentOrchestrator:
         # Phase 1: Algorithm-prioritized analysis
         agent_outputs = await self._collect_agent_outputs(user_context, research_data)
 
-        # Phase 2: Multi-agent debate and refinement (AutoGen-inspired)
-        debate_transcript = await self._run_multiagent_debate(agent_outputs)
+        # Phase 2: Multi-agent debate and consensus building
+        debate_results = await self._run_strategic_debate(user_context, agent_outputs)
+        consensus_results = self._build_strategic_consensus(debate_results)
 
         # Phase 3: Algorithm compliance validation
         compliance_report = self._validate_algorithm_compliance(agent_outputs)
@@ -57,7 +62,8 @@ class AgentOrchestrator:
         # Phase 5: Final strategy synthesis
         final_strategy = self._synthesize_strategy(
             agent_outputs,
-            debate_transcript,
+            debate_results,
+            consensus_results,
             compliance_report,
             performance_projection,
         )
@@ -66,7 +72,8 @@ class AgentOrchestrator:
             "timestamp": datetime.utcnow().isoformat(),
             "algorithm_weights": self.algorithm_weights,
             "agent_outputs": agent_outputs,
-            "debate_transcript": debate_transcript,
+            "debate_results": debate_results,
+            "consensus_results": consensus_results,
             "compliance_report": compliance_report,
             "performance_projection": performance_projection,
             "final_strategy": final_strategy,
@@ -89,15 +96,24 @@ class AgentOrchestrator:
         growth_plan = await growth_agent.generate_growth_tactics(user_context, research_data)
 
         funnel_agent = self.specialist_agents["funnel_architect"]
-        funnel_plan = await asyncio.to_thread(
-            funnel_agent.analyze,
-            {
-                "user_context": user_context,
-                "growth_plan": growth_plan,
-                "content_plan": content_plan,
-                "research_data": research_data,
-            },
-        )
+        if hasattr(funnel_agent, 'design_content_funnel'):
+            # New FunnelArchitectAgent
+            funnel_plan = funnel_agent.design_content_funnel(
+                business_goal=user_context.get("business_goal", "growth"),
+                target_audience=user_context.get("target_audience", "general"),
+                current_content_mix=content_plan.get("content_mix", {})
+            )
+        else:
+            # Legacy FunnelArchitect
+            funnel_plan = await asyncio.to_thread(
+                funnel_agent.analyze,
+                {
+                    "user_context": user_context,
+                    "growth_plan": growth_plan,
+                    "content_plan": content_plan,
+                    "research_data": research_data,
+                },
+            )
 
         return {
             "content": content_plan,
@@ -106,67 +122,117 @@ class AgentOrchestrator:
             "funnel": funnel_plan,
         }
 
-    async def _run_multiagent_debate(self, agent_outputs: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Simulate Microsoft AutoGen-style debate across consensus methods."""
+    async def _run_strategic_debate(self, user_context: Dict[str, Any], agent_outputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Run strategic debates using the enhanced debate system."""
+        
+        # Identify key strategic decisions that need debate
+        strategic_topics = self._identify_strategic_topics(agent_outputs)
+        debate_results: Dict[str, Any] = {}
+        
+        for topic in strategic_topics:
+            context = {
+                "user_context": user_context,
+                "agent_outputs": agent_outputs,
+                "topic": topic
+            }
+            
+            debate_session = self.debate_system.initiate_debate(
+                topic=topic,
+                context=context,
+                participating_agents=None  # Use all agents
+            )
+            
+            debate_results[topic] = debate_session
+            
+        await asyncio.sleep(0)  # ensure cooperative scheduling
+        return debate_results
 
-        transcript: List[Dict[str, Any]] = []
-
-        for method in self.consensus_methods:
-            if method == "conventional":
-                summary = self._conventional_consensus(agent_outputs)
-            elif method == "single_text":
-                summary = self._single_text_iteration(agent_outputs)
+    def _identify_strategic_topics(self, agent_outputs: Dict[str, Any]) -> List[str]:
+        """Identify key strategic topics that require multi-agent debate."""
+        
+        topics = []
+        
+        # Check for conflicting content strategies
+        if "content" in agent_outputs and "engagement" in agent_outputs:
+            topics.append("content_strategy_prioritization")
+            
+        # Check for growth vs conversion tensions
+        if "growth" in agent_outputs and "funnel" in agent_outputs:
+            topics.append("growth_vs_conversion_balance")
+            
+        # Always debate hashtag strategies if engagement data present
+        if "engagement" in agent_outputs:
+            topics.append("hashtag_strategy_optimization")
+            
+        # CTA optimization debates
+        if "funnel" in agent_outputs:
+            topics.append("cta_optimization_approach")
+            
+        return topics or ["overall_strategy_alignment"]
+        
+    def _build_strategic_consensus(self, debate_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Build consensus from debate results using multiple methods."""
+        
+        consensus_results: Dict[str, Any] = {}
+        
+        for topic, debate_session in debate_results.items():
+            if not debate_session.get("consensus_reached", False):
+                # Extract positions from the final round
+                final_positions = {}
+                if debate_session.get("rounds"):
+                    final_round = debate_session["rounds"][-1]
+                    final_positions = final_round.get("positions", {})
+                
+                # Try different consensus methods
+                consensus_methods = [
+                    ConsensusMethod.CONVENTIONAL,
+                    ConsensusMethod.WEIGHTED_VOTE,
+                    ConsensusMethod.MAJORITY_VOTE
+                ]
+                
+                consensus_achieved = False
+                for method in consensus_methods:
+                    context = {
+                        "topic": topic,
+                        "agent_weights": {
+                            "content_strategist": 1.0,
+                            "engagement_expert": 0.9,
+                            "growth_hacker": 0.9,
+                            "funnel_architect": 0.85
+                        }
+                    }
+                    
+                    consensus_result = self.consensus_builder.build_consensus(
+                        agent_positions=final_positions,
+                        method=method,
+                        context=context
+                    )
+                    
+                    if consensus_result.get("success", False):
+                        consensus_results[topic] = {
+                            "method": method.value,
+                            "result": consensus_result,
+                            "confidence": consensus_result.get("consensus_confidence", 0.7)
+                        }
+                        consensus_achieved = True
+                        break
+                        
+                if not consensus_achieved:
+                    # Fallback to debate system decision
+                    consensus_results[topic] = {
+                        "method": "debate_system_fallback",
+                        "result": debate_session.get("final_decision", {}),
+                        "confidence": 0.6
+                    }
             else:
-                summary = self._visioning_alignment(agent_outputs)
-
-            transcript.append({"method": method, "summary": summary})
-
-        await asyncio.sleep(0)  # ensure cooperative scheduling in async loops
-        return transcript
-
-    def _conventional_consensus(self, agent_outputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Round-robin rebuttal emphasizing watch time as primary objective."""
-
-        watch_focus = agent_outputs["content"].get("watch_time_enrichment", [])
-        engagement_ctas = agent_outputs["engagement"].get("cta_framework", {})
-        growth_trials = agent_outputs["growth"].get("trials_feature", {})
-
-        return {
-            "watch_time_alignment": watch_focus[:2],
-            "engagement_rebuttal": engagement_ctas.get("samples", [])[:2],
-            "growth_counterpoints": growth_trials.get("testing_protocol", [])[:2],
-        }
-
-    def _single_text_iteration(self, agent_outputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Single-text debate where agents iteratively refine a shared strategy."""
-
-        shared_doc: Dict[str, Any] = {
-            "hook_strategy": agent_outputs["content"].get("hook_samples", []),
-            "engagement_protocol": agent_outputs["engagement"].get("engagement_schedule", {}),
-            "growth_levers": agent_outputs["growth"].get("growth_techniques", []),
-        }
-
-        shared_doc["revision_notes"] = [
-            "Content agent introduces watch-time mandates",
-            "Engagement agent injects 20-minute response loop",
-            "Growth agent layers trials feature pressure test",
-        ]
-        return shared_doc
-
-    def _visioning_alignment(self, agent_outputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Future-back scenario planning for the next 90 days."""
-
-        return {
-            "vision_statement": "Achieve compounding discovery reach via high send-rate content",
-            "milestones": [
-                "Week 1-2: Deploy trials content and capture baseline",
-                "Week 3-6: Scale collaborations hitting 30% overlap",
-                "Week 7-12: Automate retention loops with experimental hooks",
-            ],
-            "risk_controls": agent_outputs["growth"].get("competitor_analysis", {}).get(
-                "monitoring_stack", []
-            ),
-        }
+                # Debate reached consensus
+                consensus_results[topic] = {
+                    "method": "debate_consensus",
+                    "result": debate_session.get("final_decision", {}),
+                    "confidence": 0.85
+                }
+                
+        return consensus_results
 
     def _validate_algorithm_compliance(self, agent_outputs: Dict[str, Any]) -> Dict[str, Any]:
         """Ensure each plan aligns with Adam Mosseri's 2025 guidance."""
@@ -243,23 +309,96 @@ class AgentOrchestrator:
     def _synthesize_strategy(
         self,
         agent_outputs: Dict[str, Any],
-        debate_transcript: List[Dict[str, Any]],
+        debate_results: Dict[str, Any],
+        consensus_results: Dict[str, Any],
         compliance_report: Dict[str, Any],
         performance_projection: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Merge agent proposals using consensus engine and debate insights."""
+        """Merge agent proposals using enhanced consensus and debate insights."""
 
+        # Extract consensus decisions for each strategic area
+        strategic_decisions = {}
+        implementation_priority = []
+        
+        for topic, consensus in consensus_results.items():
+            decision = consensus.get("result", {})
+            confidence = consensus.get("confidence", 0.5)
+            
+            strategic_decisions[topic] = {
+                "decision": decision,
+                "confidence": confidence,
+                "method": consensus.get("method", "unknown")
+            }
+            
+            # Add to implementation priority based on confidence
+            if confidence > 0.8:
+                implementation_priority.append(f"High priority: {topic}")
+            elif confidence > 0.6:
+                implementation_priority.append(f"Medium priority: {topic}")
+            else:
+                implementation_priority.append(f"Low priority: {topic} (requires review)")
+        
+        # Legacy consensus engine integration for backward compatibility
         consensus_ready = {
             "content": agent_outputs["content"],
             "engagement": agent_outputs["engagement"],
             "growth": agent_outputs["growth"],
             "funnel": agent_outputs["funnel"],
-            "debate": debate_transcript,
+            "strategic_decisions": strategic_decisions,
             "compliance": compliance_report,
             "performance": performance_projection,
         }
+        
+        legacy_consensus = self.consensus_engine.align(consensus_ready)
 
-        return self.consensus_engine.align(consensus_ready)
+        return {
+            "strategic_decisions": strategic_decisions,
+            "implementation_priority": implementation_priority,
+            "debate_insights": self._extract_debate_insights(debate_results),
+            "consensus_confidence": self._calculate_overall_confidence(consensus_results),
+            "legacy_alignment": legacy_consensus,
+            "next_steps": self._generate_next_steps(strategic_decisions, compliance_report),
+        }
+        
+    def _extract_debate_insights(self, debate_results: Dict[str, Any]) -> List[str]:
+        """Extract key insights from debate sessions."""
+        insights = []
+        
+        for topic, session in debate_results.items():
+            if session.get("rounds"):
+                for round_data in session["rounds"]:
+                    insights.extend(round_data.get("key_insights", []))
+                    
+        return list(dict.fromkeys(insights))  # Remove duplicates
+        
+    def _calculate_overall_confidence(self, consensus_results: Dict[str, Any]) -> float:
+        """Calculate overall confidence across all consensus decisions."""
+        if not consensus_results:
+            return 0.5
+            
+        confidences = [result.get("confidence", 0.5) for result in consensus_results.values()]
+        return round(sum(confidences) / len(confidences), 3)
+        
+    def _generate_next_steps(self, strategic_decisions: Dict[str, Any], compliance_report: Dict[str, Any]) -> List[str]:
+        """Generate actionable next steps based on strategic decisions."""
+        next_steps = []
+        
+        # Add compliance-based next steps
+        if not compliance_report.get("watch_time_present", False):
+            next_steps.append("Implement watch-time optimization in content strategy")
+            
+        if not compliance_report.get("trials_utilized", False):
+            next_steps.append("Activate trials feature for content testing")
+            
+        # Add decision-based next steps
+        for topic, decision_data in strategic_decisions.items():
+            confidence = decision_data.get("confidence", 0.5)
+            if confidence > 0.8:
+                next_steps.append(f"Execute high-confidence decision for {topic}")
+            elif confidence < 0.6:
+                next_steps.append(f"Gather more data before implementing {topic}")
+                
+        return next_steps or ["Review agent outputs and refine strategy"]
 
 
 def _resolve_agent(preferred_cls, legacy_cls):
